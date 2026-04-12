@@ -1,23 +1,14 @@
-# Logs
+# --- SYSTEM & LOGS ---
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
 .DS_Store
-dist
-dist-ssr
-coverage
-
-# Local env files
-.env
 *.local
+*.timestamp-*-*.mjs
 
-# Editor directories and files
+# --- TOOLS & EDITORS ---
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -26,16 +17,25 @@ coverage
 *.njsproj
 *.sln
 *.sw?
-
 *.tsbuildinfo
-
 .eslintcache
 
-# Vitest
+# --- FRONTEND (Vue/Vite) ---
+node_modules
+dist
+dist-ssr
+coverage
+
+# Testing artifacts (updated paths for the subfolder)
+frontend/test-results/
+frontend/playwright-report/
 __screenshots__/
 
-# Vite
-*.timestamp-*-*.mjs
-
-test-results/
-playwright-report/
+# --- BACKEND (.NET) ---
+bin/
+obj/
+appsettings.Development.json
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
