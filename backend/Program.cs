@@ -1,9 +1,12 @@
 using Microsoft.Azure.Cosmos;
 using TattooShop.Api.Repositories;
+using Microsoft.SemanticKernel;
+using TattooShop.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -24,7 +27,21 @@ builder.Services.AddSingleton(sp =>
 });
 builder.Services.AddScoped<IAppointmentRepository, CosmosAppointmentRepository>();
 builder.Services.AddScoped<ITattooDesignRepository, CosmosTattooDesignRepository>();
-builder.Services.AddControllers();
+builder.Services.AddScoped<ITattooAgentService, TattooAgentService>();
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
+
+var openAiKey = builder.Configuration["OpenAI:ApiKey"] ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured");
+var openAiModel = builder.Configuration["OpenAI:ModelId"] ?? throw new InvalidOperationException("OpenAI:ModelId is not configured");
+
+builder.Services.AddKernel().AddOpenAIChatCompletion(openAiModel, openAiKey);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend",
+        builder => builder.WithOrigins("http://localhost:5055", "https://durins-0-bane.github.io")
+                          .AllowAnyHeader()
+                          .AllowAnyMethod());
+});
 
 var app = builder.Build();
 
@@ -51,12 +68,12 @@ else
 }
 
 app.UseHttpsRedirection();
+app.UseCors("AllowFrontend");
 app.MapControllers();
 
 // Verifies DB Connection
 app.MapGet("/api/init-db", async (CosmosClient client) =>
 {
-    var databaseName = builder.Configuration["CosmosDb:DatabaseName"];
     DatabaseResponse database = await client.CreateDatabaseIfNotExistsAsync(databaseName);
     
     await database.Database.CreateContainerIfNotExistsAsync("Appointments", "/partitionKey");
@@ -67,29 +84,4 @@ app.MapGet("/api/init-db", async (CosmosClient client) =>
 .WithName("InitializeDatabase")
 .WithOpenApi();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
-
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

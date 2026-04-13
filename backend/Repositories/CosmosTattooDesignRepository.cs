@@ -30,4 +30,20 @@ public class CosmosTattooDesignRepository : ITattooDesignRepository
         }
         return results;
     }
+
+    public async Task<TattooDesign?> GetDesignByIdAsync(string id, string customerId)
+    {
+        try
+        {
+            ItemResponse<TattooDesign> response = await _container.ReadItemAsync<TattooDesign>(
+                id, 
+                new PartitionKey(customerId)
+            );
+            return response.Resource;
+        }
+        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
 }
