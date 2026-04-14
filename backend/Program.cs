@@ -33,7 +33,9 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Progr
 var openAiKey = builder.Configuration["OpenAI:ApiKey"] ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured");
 var openAiModel = builder.Configuration["OpenAI:ModelId"] ?? throw new InvalidOperationException("OpenAI:ModelId is not configured");
 
-builder.Services.AddKernel().AddOpenAIChatCompletion(openAiModel, openAiKey);
+builder.Services.AddKernel()
+    .AddOpenAIChatCompletion(openAiModel, openAiKey)
+    .AddOpenAITextToImage(openAiKey);
 
 builder.Services.AddCors(options =>
 {

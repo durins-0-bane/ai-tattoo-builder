@@ -14,20 +14,22 @@ public class AgentController : ControllerBase
         _agentService = agentService;
     }
 
-    [HttpPost("chat")]
-    public async Task<ActionResult<ChatResponse>> Chat([FromBody] ChatRequest request)
+    [HttpPost("chat-stream")]
+    public async IAsyncEnumerable<string> ChatStream([FromBody] ChatRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Message))
         {
-            return BadRequest(new { error = "Message cannot be empty." });
+            yield return "Error: Message cannot be empty.";
+            yield break; 
         }
 
-        var reply = await _agentService.ChatAsync(request.Message);
+        var stream = _agentService.ChatStreamAsync(request.Message);
         
-        return Ok(new ChatResponse(reply));
+        await foreach (var chunk in stream)
+        {
+            yield return chunk;
+        }
     }
 }
 
 public record ChatRequest(string Message);
-
-public record ChatResponse(string Reply);
