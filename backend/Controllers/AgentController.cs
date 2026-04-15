@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TattooShop.Api.Models;
 using TattooShop.Api.Services;
 
 namespace TattooShop.Api.Controllers;
@@ -15,11 +16,11 @@ public class AgentController : ControllerBase
     }
 
     [HttpPost("chat-stream")]
-    public async IAsyncEnumerable<string> ChatStream([FromBody] ChatRequest request)
+    public async IAsyncEnumerable<ChatResponseChunk> ChatStream([FromBody] ChatRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Message))
         {
-            yield return "Error: Message cannot be empty.";
+            yield return new ChatResponseChunk { Text = "Error: Message cannot be empty." };
             yield break; 
         }
 

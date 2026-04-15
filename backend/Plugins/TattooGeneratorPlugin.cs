@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 using Microsoft.SemanticKernel;
 
@@ -45,8 +44,6 @@ public class TattooGeneratorPlugin(HttpClient httpClient, IConfiguration config,
                     var imageBytes = await response.Content.ReadAsByteArrayAsync();
                     var base64 = Convert.ToBase64String(imageBytes);
                     
-                    // THE ONLY CHANGE: Return a structured object
-                    // We tell the AI "It's done", but we hide the raw data in a separate property
                     return new ImageResult(
                         MessageToAi: "The image has been generated successfully. Tell the user here is their design.", 
                         Base64Data: $"data:image/png;base64,{base64}"

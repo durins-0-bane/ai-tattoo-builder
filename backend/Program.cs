@@ -1,6 +1,8 @@
+using MediatR;
 using Microsoft.Azure.Cosmos;
-using TattooShop.Api.Repositories;
 using Microsoft.SemanticKernel;
+using TattooShop.Api.Features.Behaviors;
+using TattooShop.Api.Repositories;
 using TattooShop.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,6 +31,9 @@ builder.Services.AddScoped<IAppointmentRepository, CosmosAppointmentRepository>(
 builder.Services.AddScoped<ITattooDesignRepository, CosmosTattooDesignRepository>();
 builder.Services.AddScoped<ITattooAgentService, TattooAgentService>();
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(RetryBehavior<,>));
 builder.Services.AddHttpClient();
 
 var openAiKey = builder.Configuration["OpenAI:ApiKey"] ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured");

@@ -9,6 +9,6 @@ public record Appointment(
     string CustomerEmail,
     DateTime StartTime,
     int DurationMinutes,
-    string ServiceType, // e.g., "Consultation", "Tattoo Session"
-    string Status // e.g., "Pending", "Confirmed", "Completed"
+    string ServiceType,
+    string Status
 );

@@ -1,4 +1,6 @@
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using TattooShop.Api.Features;
 using TattooShop.Api.Models;
 using TattooShop.Api.Repositories;
 
@@ -6,9 +8,10 @@ namespace TattooShop.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")] // potentially add auth here later, e.g. [Authorize]
-public class AppointmentsController(IAppointmentRepository repository) : ControllerBase
+public class AppointmentsController(IAppointmentRepository repository, IMediator mediator) : ControllerBase
 {
     private readonly IAppointmentRepository _repository = repository;
+    private readonly IMediator _mediator = mediator;
 
     /// <summary>
     /// Gets all appointments for a specific artist.
@@ -46,8 +49,7 @@ public class AppointmentsController(IAppointmentRepository repository) : Control
     [HttpPost]
     public async Task<ActionResult<Appointment>> Create(Appointment appointment)
     {
-        // Possibly add date/time validation here
-        await _repository.AddAppointmentAsync(appointment);
-        return Ok(appointment);
+        var result = await _mediator.Send(new BookAppointmentCommand(appointment));
+        return Ok(result);
     }
 }
