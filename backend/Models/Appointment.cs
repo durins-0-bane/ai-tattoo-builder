@@ -5,6 +5,7 @@ namespace TattooShop.Api.Models;
 public record Appointment(
     [property: JsonProperty("id")] string Id,
     [property: JsonProperty("partitionKey")] string ArtistId,
+    string CustomerUserId,
     string CustomerName,
     string CustomerEmail,
     DateTime StartTime,

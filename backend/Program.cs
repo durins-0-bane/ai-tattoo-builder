@@ -1,5 +1,8 @@
+using System.Text;
 using MediatR;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Azure.Cosmos;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.SemanticKernel;
 using TattooShop.Api.Features.Behaviors;
 using TattooShop.Api.Repositories;
@@ -28,13 +31,40 @@ builder.Services.AddSingleton(sp =>
     });
 });
 builder.Services.AddScoped<IAppointmentRepository, CosmosAppointmentRepository>();
+builder.Services.AddScoped<IArtistProfileRepository, CosmosArtistProfileRepository>();
+builder.Services.AddScoped<IChatMessageRepository, CosmosChatMessageRepository>();
+builder.Services.AddScoped<IChatSessionRepository, CosmosChatSessionRepository>();
 builder.Services.AddScoped<ITattooDesignRepository, CosmosTattooDesignRepository>();
+builder.Services.AddScoped<IUserRepository, CosmosUserRepository>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ChatExecutionContext>();
 builder.Services.AddScoped<ITattooAgentService, TattooAgentService>();
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(RetryBehavior<,>));
 builder.Services.AddHttpClient();
+
+var jwtSecret = builder.Configuration["Auth:Jwt:Secret"]
+    ?? throw new InvalidOperationException("Auth:Jwt:Secret is not configured.");
+var jwtIssuer = builder.Configuration["Auth:Jwt:Issuer"] ?? "TattooShop.Api";
+var jwtAudience = builder.Configuration["Auth:Jwt:Audience"] ?? "TattooShop.Client";
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+        };
+    });
+builder.Services.AddAuthorization();
 
 var openAiKey = builder.Configuration["OpenAI:ApiKey"] ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured");
 var openAiModel = builder.Configuration["OpenAI:ModelId"] ?? throw new InvalidOperationException("OpenAI:ModelId is not configured");
@@ -45,7 +75,10 @@ builder.Services.AddKernel()
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
-        builder => builder.WithOrigins("http://localhost:5055", "https://durins-0-bane.github.io")
+        builder => builder.WithOrigins(
+                        "http://localhost:7247",
+                        "http://localhost:5173",
+                        "https://durins-0-bane.github.io")
                           .AllowAnyHeader()
                           .AllowAnyMethod());
 });
@@ -76,6 +109,8 @@ else
 
 app.UseHttpsRedirection();
 app.UseCors("AllowFrontend");
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 
 // Verifies DB Connection
@@ -84,7 +119,11 @@ app.MapGet("/api/init-db", async (CosmosClient client) =>
     DatabaseResponse database = await client.CreateDatabaseIfNotExistsAsync(databaseName);
     
     await database.Database.CreateContainerIfNotExistsAsync("Appointments", "/partitionKey");
+    await database.Database.CreateContainerIfNotExistsAsync("Artists", "/partitionKey");
+    await database.Database.CreateContainerIfNotExistsAsync("ChatMessages", "/partitionKey");
+    await database.Database.CreateContainerIfNotExistsAsync("ChatSessions", "/partitionKey");
     await database.Database.CreateContainerIfNotExistsAsync("Designs", "/partitionKey");
+    await database.Database.CreateContainerIfNotExistsAsync("Users", "/partitionKey");
     
     return Results.Ok(new { message = "Database and Containers initialized!" });
 })

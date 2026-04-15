@@ -4,29 +4,36 @@ using Microsoft.SemanticKernel;
 using TattooShop.Api.Features;
 using TattooShop.Api.Models;
 using TattooShop.Api.Repositories;
+using TattooShop.Api.Services;
 
 namespace TattooShop.Api.Plugins;
 
-public class AppointmentPlugin(IMediator mediator, IAppointmentRepository repository)
+public class AppointmentPlugin(IMediator mediator, IAppointmentRepository repository, ChatExecutionContext executionContext)
 {
+    private readonly ChatExecutionContext _executionContext = executionContext;
+
     [KernelFunction("book_appointment")]
-    [Description("Books a new appointment for a customer with a specific artist.")]
+    [Description("Books a new appointment for the signed-in customer with a specific artist.")]
     public async Task<string> BookAppointmentAsync(
         string artistId,
-        string customerName,
-        string customerEmail,
-        [Description("Appointment start time in UTC (e.g. 2026-05-01T14:00:00Z).")] string startTimeUtc,
+        [Description("Appointment start time in UTC (e.g. 2026-05-01T14:00:00Z).")]
+        string startTimeUtc,
         int appointmentDurationInMinutes,
-        [Description("Service type, e.g. 'New Tattoo', 'Touch-up', 'Consultation'.")] string serviceType)
+        [Description("Service type, e.g. 'New Tattoo', 'Touch-up', 'Consultation'.")]
+        string serviceType)
     {
+        if (string.IsNullOrWhiteSpace(_executionContext.UserId))
+            return "Error: You must be signed in before booking an appointment.";
+
         if (!DateTime.TryParse(startTimeUtc, out var startTime))
             return "Error: Invalid start time format. Use UTC.";
 
         var appointment = new Appointment(
             Id: Guid.NewGuid().ToString(),
             ArtistId: artistId,
-            CustomerName: customerName,
-            CustomerEmail: customerEmail,
+            CustomerUserId: _executionContext.UserId,
+            CustomerName: _executionContext.UserDisplayName,
+            CustomerEmail: _executionContext.UserEmail,
             StartTime: startTime.ToUniversalTime(),
             DurationMinutes: appointmentDurationInMinutes,
             ServiceType: serviceType,
@@ -34,7 +41,7 @@ public class AppointmentPlugin(IMediator mediator, IAppointmentRepository reposi
         );
 
         await mediator.Send(new BookAppointmentCommand(appointment));
-        return $"Appointment {appointment.Id} booked for {customerName} on {startTime:f} UTC.";
+        return $"Appointment {appointment.Id} booked for {_executionContext.UserDisplayName} on {startTime:f} UTC.";
     }
 
     [KernelFunction("get_artist_appointments")]

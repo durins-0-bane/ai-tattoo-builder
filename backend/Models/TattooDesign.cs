@@ -9,6 +9,8 @@ public record TattooDesign(
     string Prompt,
     string RefinedPrompt,
     string Style,
+    string? ArtistId,
+    string? SessionId,
     DateTime CreatedAt,
     bool IsFavorite
 );

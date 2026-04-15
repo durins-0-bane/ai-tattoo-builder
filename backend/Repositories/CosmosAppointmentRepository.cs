@@ -35,7 +35,7 @@ public class CosmosAppointmentRepository : IAppointmentRepository
     public async Task<IEnumerable<Appointment>> GetAppointmentsByArtistAsync(string artistId)
     {
         var query = _container.GetItemQueryIterator<Appointment>(
-            new QueryDefinition("SELECT * FROM c WHERE c.partitionKey = @artistId")
+            new QueryDefinition("SELECT * FROM c WHERE c.partitionKey = @artistId ORDER BY c.startTime ASC")
                 .WithParameter("@artistId", artistId));
 
         var results = new List<Appointment>();
@@ -44,6 +44,22 @@ public class CosmosAppointmentRepository : IAppointmentRepository
             var response = await query.ReadNextAsync();
             results.AddRange(response);
         }
+        return results;
+    }
+
+    public async Task<IEnumerable<Appointment>> GetAppointmentsByCustomerAsync(string customerUserId)
+    {
+        var query = _container.GetItemQueryIterator<Appointment>(
+            new QueryDefinition("SELECT * FROM c WHERE c.customerUserId = @customerUserId ORDER BY c.startTime ASC")
+                .WithParameter("@customerUserId", customerUserId));
+
+        var results = new List<Appointment>();
+        while (query.HasMoreResults)
+        {
+            var response = await query.ReadNextAsync();
+            results.AddRange(response);
+        }
+
         return results;
     }
 }

@@ -19,7 +19,7 @@ public class CosmosTattooDesignRepository : ITattooDesignRepository
     public async Task<IEnumerable<TattooDesign>> GetDesignsByCustomerAsync(string customerId)
     {
         var query = _container.GetItemQueryIterator<TattooDesign>(
-            new QueryDefinition("SELECT * FROM c WHERE c.partitionKey = @customerId")
+            new QueryDefinition("SELECT * FROM c WHERE c.partitionKey = @customerId ORDER BY c.createdAt DESC")
                 .WithParameter("@customerId", customerId));
 
         var results = new List<TattooDesign>();
@@ -46,4 +46,7 @@ public class CosmosTattooDesignRepository : ITattooDesignRepository
             return null;
         }
     }
+
+    public async Task UpdateDesignAsync(TattooDesign design) =>
+        await _container.UpsertItemAsync(design, new PartitionKey(design.CustomerId));
 }

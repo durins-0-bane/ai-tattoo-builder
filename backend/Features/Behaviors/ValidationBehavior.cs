@@ -8,6 +8,8 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
     {
         if (request is BookAppointmentCommand cmd)
         {
+            if (string.IsNullOrWhiteSpace(cmd.Appointment.CustomerUserId))
+                throw new ArgumentException("Customer user ID is required.");
             if (string.IsNullOrWhiteSpace(cmd.Appointment.CustomerEmail))
                 throw new ArgumentException("Customer email is required.");
             if (cmd.Appointment.DurationMinutes <= 0)

@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TattooShop.Api.Features;
 using TattooShop.Api.Models;
@@ -7,11 +9,19 @@ using TattooShop.Api.Repositories;
 namespace TattooShop.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")] // potentially add auth here later, e.g. [Authorize]
+[Authorize]
+[Route("api/[controller]")]
 public class AppointmentsController(IAppointmentRepository repository, IMediator mediator) : ControllerBase
 {
     private readonly IAppointmentRepository _repository = repository;
     private readonly IMediator _mediator = mediator;
+
+    [HttpGet("mine")]
+    public async Task<ActionResult<IEnumerable<Appointment>>> GetMine()
+    {
+        var appointments = await _repository.GetAppointmentsByCustomerAsync(GetUserId());
+        return Ok(appointments);
+    }
 
     /// <summary>
     /// Gets all appointments for a specific artist.
@@ -47,9 +57,37 @@ public class AppointmentsController(IAppointmentRepository repository, IMediator
     /// </summary>
     /// <param name="appointment">The appointment to create. Artist's ID is required.</param>
     [HttpPost]
-    public async Task<ActionResult<Appointment>> Create(Appointment appointment)
+    public async Task<ActionResult<Appointment>> Create(CreateAppointmentRequest request)
     {
+        var appointment = new Appointment(
+            Id: Guid.NewGuid().ToString(),
+            ArtistId: request.ArtistId,
+            CustomerUserId: GetUserId(),
+            CustomerName: GetUserDisplayName(),
+            CustomerEmail: GetUserEmail(),
+            StartTime: request.StartTimeUtc.ToUniversalTime(),
+            DurationMinutes: request.DurationMinutes,
+            ServiceType: request.ServiceType,
+            Status: "Pending");
+
         var result = await _mediator.Send(new BookAppointmentCommand(appointment));
         return Ok(result);
     }
+
+    private string GetUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? User.FindFirstValue("sub")
+        ?? throw new UnauthorizedAccessException("User ID claim is missing.");
+
+    private string GetUserEmail() =>
+        User.FindFirstValue(ClaimTypes.Email)
+        ?? User.FindFirstValue("email")
+        ?? string.Empty;
+
+    private string GetUserDisplayName() =>
+        User.FindFirstValue(ClaimTypes.Name)
+        ?? User.FindFirstValue("name")
+        ?? "Tattoo Collector";
 }
+
+public record CreateAppointmentRequest(string ArtistId, DateTime StartTimeUtc, int DurationMinutes, string ServiceType);
