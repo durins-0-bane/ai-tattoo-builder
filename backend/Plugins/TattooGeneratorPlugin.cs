@@ -2,14 +2,16 @@ using System.ComponentModel;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.SemanticKernel;
+using TattooShop.Api.Services;
 
 namespace TattooShop.Api.Plugins;
 
-public class TattooGeneratorPlugin(HttpClient httpClient, IConfiguration config, ILogger<TattooGeneratorPlugin> logger)
+public class TattooGeneratorPlugin(HttpClient httpClient, IConfiguration config, ILogger<TattooGeneratorPlugin> logger, ChatExecutionContext executionContext)
 {
     private readonly HttpClient _httpClient = httpClient;
     private readonly string _hfToken = config["HuggingFace:ApiKey"] ?? throw new ArgumentException("Hugging Face API Key missing!");
     private readonly ILogger<TattooGeneratorPlugin> _logger = logger;
+    private readonly ChatExecutionContext _executionContext = executionContext;
     private static readonly string[] _retryTriggers = 
     [ 
         "currently loading", 
@@ -44,9 +46,9 @@ public class TattooGeneratorPlugin(HttpClient httpClient, IConfiguration config,
                     var imageBytes = await response.Content.ReadAsByteArrayAsync();
                     var base64 = Convert.ToBase64String(imageBytes);
                     
+                    _executionContext.GeneratedImageBase64 = $"data:image/png;base64,{base64}";
                     return new ImageResult(
-                        MessageToAi: "The image has been generated successfully. Tell the user here is their design.", 
-                        Base64Data: $"data:image/png;base64,{base64}"
+                        MessageToAi: $"The image has been generated successfully using this prompt: \"{refinedPrompt}\". Tell the user here is their design. If they want changes, refine the prompt based on their feedback and generate again."
                     );
                 }
 

@@ -1,5 +1,5 @@
 using System.Text;
-using System.Text.Json;
+using System.Text.RegularExpressions;
 using MediatR;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -7,11 +7,10 @@ using Microsoft.SemanticKernel.Connectors.OpenAI;
 using TattooShop.Api.Models;
 using TattooShop.Api.Plugins;
 using TattooShop.Api.Repositories;
-using static TattooShop.Api.Plugins.TattooGeneratorPlugin;
 
 namespace TattooShop.Api.Services;
 
-public class TattooAgentService : ITattooAgentService
+public partial class TattooAgentService : ITattooAgentService
 {
     private readonly IArtistProfileRepository _artistProfileRepository;
     private readonly IAppointmentRepository _appointmentRepository;
@@ -51,7 +50,7 @@ public class TattooAgentService : ITattooAgentService
         _chatCompletionService = _kernel.GetRequiredService<IChatCompletionService>();
 
         _kernel.Plugins.AddFromObject(new TattooPortfolioPlugin(_mediator, _chatExecutionContext), "Portfolio");
-        _kernel.Plugins.AddFromObject(new TattooGeneratorPlugin(_httpClient, _configuration, loggerFactory.CreateLogger<TattooGeneratorPlugin>()), "Generator");
+        _kernel.Plugins.AddFromObject(new TattooGeneratorPlugin(_httpClient, _configuration, loggerFactory.CreateLogger<TattooGeneratorPlugin>(), _chatExecutionContext), "Generator");
         _kernel.Plugins.AddFromObject(new AppointmentPlugin(_mediator, _appointmentRepository, _chatExecutionContext), "Appointments");
     }
 
@@ -63,13 +62,7 @@ public class TattooAgentService : ITattooAgentService
         string? sessionId,
         string userMessage)
     {
-        await _artistProfileRepository.EnsureSeedDataAsync();
-        var artist = await _artistProfileRepository.GetByIdAsync(artistId);
-        if (artist is null)
-        {
-            throw new InvalidOperationException($"Artist {artistId} was not found.");
-        }
-
+        var artist = await _artistProfileRepository.GetByIdAsync(artistId) ?? throw new InvalidOperationException($"Artist {artistId} was not found.");
         var session = await GetOrCreateSessionAsync(userId, artistId, sessionId, userMessage);
         var existingMessages = await _chatMessageRepository.GetBySessionAsync(session.Id);
 
@@ -109,7 +102,6 @@ public class TattooAgentService : ITattooAgentService
         };
 
         var textBuilder = new StringBuilder();
-        string? imageBase64 = null;
 
         var resultStream = _chatCompletionService.GetStreamingChatMessageContentsAsync(
             history,
@@ -124,26 +116,28 @@ public class TattooAgentService : ITattooAgentService
             }
         }
 
-        var lastToolMessage = history.LastOrDefault(m => m.Role == AuthorRole.Tool);
-        if (lastToolMessage?.Content is { } toolContent && toolContent.Contains("Base64Data"))
-        {
-            try
-            {
-                var toolResult = JsonSerializer.Deserialize<ImageResult>(toolContent, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-                imageBase64 = toolResult?.Base64Data;
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogWarning(ex, "Failed to parse tool image result. Raw content: {Content}", toolContent);
-            }
-        }
-
         var responseText = string.IsNullOrWhiteSpace(textBuilder.ToString())
             ? "I mapped out a concept for you."
             : textBuilder.ToString().Trim();
+
+        var imageBase64 = _chatExecutionContext.GeneratedImageBase64;
+
+        if (imageBase64 is null)
+        {
+            var inlineImageMatch = InlineDataImageMarkdownCaptureRegex().Match(responseText);
+            if (inlineImageMatch.Success)
+            {
+                imageBase64 = inlineImageMatch.Groups[1].Value;
+            }
+        }
+
+        if (imageBase64 is not null)
+        {
+            responseText = InlineDataImageMarkdownRegex().Replace(responseText, string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(responseText))
+                responseText = "I mapped out a concept for you.";
+        }
 
         await _chatMessageRepository.AddAsync(new ChatMessage(
             Id: Guid.NewGuid().ToString(),
@@ -194,4 +188,10 @@ public class TattooAgentService : ITattooAgentService
         "- Recommend placement, line weight, and longevity considerations where useful.\n" +
         "- If booking is requested, use the appointment tool.\n" +
         $"Artist bio: {artist.Bio}";
+
+    [GeneratedRegex(@"!\[.*?\]\(data:image\/[^)]+\)")]
+    private static partial Regex InlineDataImageMarkdownRegex();
+
+    [GeneratedRegex(@"!\[.*?\]\((data:image\/[^)]+)\)")]
+    private static partial Regex InlineDataImageMarkdownCaptureRegex();
 }

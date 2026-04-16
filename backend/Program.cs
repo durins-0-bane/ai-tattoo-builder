@@ -113,6 +113,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+// Seed artist profiles on startup
+using (var scope = app.Services.CreateScope())
+{
+    var artistRepo = scope.ServiceProvider.GetRequiredService<IArtistProfileRepository>();
+    await artistRepo.EnsureSeedDataAsync();
+}
+
 // Verifies DB Connection
 app.MapGet("/api/init-db", async (CosmosClient client) =>
 {

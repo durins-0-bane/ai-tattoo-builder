@@ -4,7 +4,7 @@
       <button class="ghost-button" @click="startFreshSession">New concept</button>
     </template>
 
-    <div v-if="bootstrapLoading" class="panel empty-state">Loading your studio...</div>
+    <div v-if="loading" class="panel empty-state">Loading your studio...</div>
 
     <div v-else class="chat-layout">
       <section class="panel sidebar-panel">
@@ -42,7 +42,7 @@
         </div>
       </section>
 
-      <section class="panel conversation-panel">
+      <section class="panel conversation-panel" :aria-busy="chatLoading">
         <div class="artist-hero" :style="{ '--accent': activeArtist?.accentColor ?? '#d7a86e' }">
           <div>
             <p class="section-label">Currently channeling</p>
@@ -88,10 +88,15 @@
             </button>
           </article>
 
-          <div v-if="!messages.length" class="empty-state tall">
+          <div v-if="!messages.length && !chatLoading" class="empty-state tall">
             Start a conversation and ask one of the studio artists for a concept, a placement
             recommendation, or a booking suggestion.
           </div>
+
+          <article v-if="chatLoading" class="message assistant thinking">
+            <p class="message-role">{{ activeArtist?.displayName ?? 'Artist' }}</p>
+            <LoadingIndicator text="Sketching" size="small" />
+          </article>
         </div>
 
         <form class="composer" @submit.prevent="submitMessage">
@@ -99,9 +104,15 @@
             v-model="draft"
             rows="4"
             placeholder="Ask for a concept, refinement, placement note, or appointment idea..."
+            :disabled="chatLoading"
           />
-          <button class="primary-button" :disabled="loading || !draft.trim() || !selectedArtistId">
-            {{ loading ? 'Sketching...' : 'Send brief' }}
+          <button
+            class="primary-button"
+            :disabled="chatLoading || !draft.trim() || !selectedArtistId"
+            :aria-label="chatLoading ? 'AI is sketching your concept' : 'Send brief'"
+          >
+            <LoadingIndicator v-if="chatLoading" text="Sketching" size="small" />
+            <span v-else>Send brief</span>
           </button>
         </form>
       </section>
@@ -113,6 +124,7 @@
 import { defineComponent } from 'vue'
 import { mapState } from 'pinia'
 import AppShell from '@/components/AppShell.vue'
+import LoadingIndicator from '@/components/LoadingIndicator.vue'
 import { useAuthStore } from '@/stores/auth'
 import { fetchArtists, type ArtistProfile } from '@/services/artistService'
 import {
@@ -126,7 +138,7 @@ import { saveDesign } from '@/services/designService'
 
 export default defineComponent({
   name: 'ChatView',
-  components: { AppShell },
+  components: { AppShell, LoadingIndicator },
   data() {
     return {
       artists: [] as ArtistProfile[],
@@ -135,8 +147,8 @@ export default defineComponent({
       selectedArtistId: '',
       activeSessionId: null as string | null,
       draft: '',
-      loading: false,
-      bootstrapLoading: true,
+      chatLoading: false,
+      loading: true,
       error: null as string | null,
       saveNotice: null as string | null,
       savedKeys: [] as string[],
@@ -156,17 +168,17 @@ export default defineComponent({
     },
   },
   mounted() {
-    this.bootstrap()
+    this.initialize()
   },
   methods: {
     messageKey(message: ChatMessage, index: number): string {
       return `${message.createdAt}-${index}`
     },
 
-    async bootstrap() {
+    async initialize() {
       if (!this.token) return
 
-      this.bootstrapLoading = true
+      this.loading = true
       this.error = null
 
       try {
@@ -188,7 +200,7 @@ export default defineComponent({
       } catch (err) {
         this.error = err instanceof Error ? err.message : 'Failed to load the studio workspace.'
       } finally {
-        this.bootstrapLoading = false
+        this.loading = false
       }
     },
 
@@ -210,7 +222,7 @@ export default defineComponent({
       if (!this.token || !this.draft.trim() || !this.selectedArtistId) return
 
       const userText = this.draft.trim()
-      this.loading = true
+      this.chatLoading = true
       this.error = null
       this.saveNotice = null
 
@@ -250,12 +262,22 @@ export default defineComponent({
             createdAt: new Date().toISOString(),
           },
         ]
-
-        this.sessions = await fetchChatSessions(this.token)
       } catch (err) {
         this.error = err instanceof Error ? err.message : 'The artist could not answer right now.'
       } finally {
-        this.loading = false
+        this.chatLoading = false
+      }
+
+      await this.refreshSessionsNonCritical()
+    },
+
+    async refreshSessionsNonCritical() {
+      if (!this.token) return
+
+      try {
+        this.sessions = await fetchChatSessions(this.token)
+      } catch (err) {
+        console.warn('Session list refresh failed after sending message.', err)
       }
     },
 
@@ -292,6 +314,9 @@ export default defineComponent({
   display: grid;
   grid-template-columns: 300px 1fr;
   gap: 1.25rem;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .panel {
@@ -306,12 +331,16 @@ export default defineComponent({
   display: grid;
   gap: 1.5rem;
   align-content: start;
+  overflow-y: auto;
 }
 
 .conversation-panel {
   padding: 1.25rem;
   display: grid;
   gap: 1rem;
+  grid-template-rows: auto auto 1fr auto;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .section-label {
@@ -386,9 +415,11 @@ export default defineComponent({
 }
 
 .message-stack {
-  min-height: 420px;
+  min-height: 0;
   display: grid;
   gap: 0.9rem;
+  align-content: start;
+  overflow-y: auto;
 }
 
 .message {
@@ -408,6 +439,26 @@ export default defineComponent({
   background: rgba(255, 255, 255, 0.05);
 }
 
+.message.thinking {
+  opacity: 0.7;
+}
+
+textarea:disabled {
+  opacity: 1;
+  background: rgba(42, 46, 51, 0.96);
+  border-color: rgba(210, 218, 226, 0.36);
+  color: #d4dce4;
+  cursor: not-allowed;
+}
+
+.primary-button:disabled {
+  opacity: 1;
+  background: linear-gradient(135deg, #7f8790, #626871);
+  color: #f4f6f8;
+  border: 1px solid rgba(244, 246, 248, 0.22);
+  cursor: not-allowed;
+}
+
 .message-role {
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -419,6 +470,8 @@ export default defineComponent({
 .message-text {
   line-height: 1.6;
   white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .message-image {

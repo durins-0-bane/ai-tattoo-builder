@@ -15,15 +15,18 @@ public class CosmosUserRepository : IUserRepository
 
     public async Task<TattooUser?> GetByIdAsync(string id)
     {
-        try
+        var query = _container.GetItemQueryIterator<TattooUser>(
+            new QueryDefinition("SELECT * FROM c WHERE c.id = @id")
+                .WithParameter("@id", id));
+
+        while (query.HasMoreResults)
         {
-            var response = await _container.ReadItemAsync<TattooUser>(id, new PartitionKey(id));
-            return response.Resource;
+            var response = await query.ReadNextAsync();
+            if (response.Count > 0)
+                return response.First();
         }
-        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            return null;
-        }
+
+        return null;
     }
 
     public async Task<TattooUser?> GetByGoogleSubjectAsync(string googleSubject)

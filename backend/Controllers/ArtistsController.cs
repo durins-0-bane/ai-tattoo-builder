@@ -15,7 +15,6 @@ public class ArtistsController(IArtistProfileRepository artistProfileRepository)
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ArtistProfile>>> GetAll()
     {
-        await _artistProfileRepository.EnsureSeedDataAsync();
         var artists = await _artistProfileRepository.GetActiveArtistsAsync();
         return Ok(artists);
     }
@@ -23,7 +22,6 @@ public class ArtistsController(IArtistProfileRepository artistProfileRepository)
     [HttpGet("{id}")]
     public async Task<ActionResult<ArtistProfile>> GetById(string id)
     {
-        await _artistProfileRepository.EnsureSeedDataAsync();
         var artist = await _artistProfileRepository.GetByIdAsync(id);
         if (artist is null)
         {

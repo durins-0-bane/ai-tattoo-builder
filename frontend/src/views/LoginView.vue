@@ -8,7 +8,9 @@
         {{ error }}
       </div>
 
-      <div v-if="loading" class="loading">Signing in...</div>
+      <div v-if="loading || redirecting" aria-live="polite">
+        <LoadingIndicator text="Signing you in" />
+      </div>
 
       <div v-else>
         <GoogleSignInButton />
@@ -22,17 +24,28 @@ import { defineComponent } from 'vue'
 import { mapState } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import GoogleSignInButton from '@/components/GoogleSignInButton.vue'
+import LoadingIndicator from '@/components/LoadingIndicator.vue'
 
 export default defineComponent({
   name: 'LoginView',
-  components: { GoogleSignInButton },
+  components: { GoogleSignInButton, LoadingIndicator },
+  data() {
+    return {
+      redirecting: false,
+    }
+  },
   computed: {
     ...mapState(useAuthStore, ['isAuthenticated', 'loading', 'error']),
   },
   watch: {
-    isAuthenticated(authenticated: boolean) {
+    async isAuthenticated(authenticated: boolean) {
       if (authenticated) {
-        this.$router.push({ name: 'chat' })
+        this.redirecting = true
+        try {
+          await this.$router.replace({ name: 'chat' })
+        } catch {
+          this.redirecting = false
+        }
       }
     },
   },
@@ -45,7 +58,7 @@ export default defineComponent({
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  height: 100%;
   background: #0f0f0f;
 }
 
@@ -86,8 +99,5 @@ h1 {
   font-size: 0.875rem;
 }
 
-.loading {
-  color: #888;
-  font-size: 0.95rem;
-}
+
 </style>

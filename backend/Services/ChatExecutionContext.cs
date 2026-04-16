@@ -7,4 +7,5 @@ public class ChatExecutionContext
     public string UserDisplayName { get; set; } = string.Empty;
     public string ArtistId { get; set; } = string.Empty;
     public string SessionId { get; set; } = string.Empty;
+    public string? GeneratedImageBase64 { get; set; }
 }

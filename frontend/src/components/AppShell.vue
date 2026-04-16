@@ -82,9 +82,10 @@ export default defineComponent({
 
 <style scoped>
 .shell {
-  min-height: 100vh;
+  height: 100%;
   display: grid;
   grid-template-columns: 300px 1fr;
+  overflow: hidden;
   background:
     radial-gradient(circle at top left, rgba(196, 149, 86, 0.18), transparent 28%),
     linear-gradient(135deg, #090909 0%, #121212 48%, #18130f 100%);
@@ -173,6 +174,9 @@ export default defineComponent({
 
 .content {
   padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .page-header {
@@ -192,6 +196,8 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  flex: 1;
+  min-height: 0;
 }
 
 @media (max-width: 980px) {
