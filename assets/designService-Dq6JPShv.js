@@ -1,0 +1,1 @@
+import{n as e}from"./artistService-CPJwVGLC.js";function t(t){return e(`/api/tattoodesigns/mine`,{token:t})}function n(t,n){return e(`/api/tattoodesigns`,{method:`POST`,token:t,body:n})}function r(t,n){return e(`/api/tattoodesigns/${n}/favorite`,{method:`PATCH`,token:t})}export{n,r,t};
