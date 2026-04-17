@@ -23,6 +23,7 @@ public partial class TattooAgentService : ITattooAgentService
     private readonly Kernel _kernel;
     private readonly ILogger<TattooAgentService> _logger;
     private readonly IMediator _mediator;
+    private readonly IBlobStorageService _blobStorage;
 
     public TattooAgentService(
         Kernel kernel,
@@ -35,7 +36,8 @@ public partial class TattooAgentService : ITattooAgentService
         IAppointmentRepository appointmentRepository,
         IChatMessageRepository chatMessageRepository,
         IChatSessionRepository chatSessionRepository,
-        ChatExecutionContext chatExecutionContext)
+        ChatExecutionContext chatExecutionContext,
+        IBlobStorageService blobStorage)
     {
         _kernel = kernel;
         _mediator = mediator;
@@ -47,10 +49,11 @@ public partial class TattooAgentService : ITattooAgentService
         _chatMessageRepository = chatMessageRepository;
         _chatSessionRepository = chatSessionRepository;
         _chatExecutionContext = chatExecutionContext;
+        _blobStorage = blobStorage;
         _chatCompletionService = _kernel.GetRequiredService<IChatCompletionService>();
 
         _kernel.Plugins.AddFromObject(new TattooPortfolioPlugin(_mediator, _chatExecutionContext), "Portfolio");
-        _kernel.Plugins.AddFromObject(new TattooGeneratorPlugin(_httpClient, _configuration, loggerFactory.CreateLogger<TattooGeneratorPlugin>(), _chatExecutionContext), "Generator");
+        _kernel.Plugins.AddFromObject(new TattooGeneratorPlugin(_httpClient, _configuration, loggerFactory.CreateLogger<TattooGeneratorPlugin>(), _chatExecutionContext, _blobStorage), "Generator");
         _kernel.Plugins.AddFromObject(new AppointmentPlugin(_mediator, _appointmentRepository, _chatExecutionContext), "Appointments");
     }
 
@@ -78,7 +81,7 @@ public partial class TattooAgentService : ITattooAgentService
             UserId: userId,
             Role: "user",
             Content: userMessage,
-            ImageBase64: null,
+            ImageUrl: null,
             CreatedAt: DateTime.UtcNow));
 
         var history = new ChatHistory(BuildSystemPrompt(artist, userDisplayName));
@@ -120,18 +123,18 @@ public partial class TattooAgentService : ITattooAgentService
             ? "I mapped out a concept for you."
             : textBuilder.ToString().Trim();
 
-        var imageBase64 = _chatExecutionContext.GeneratedImageBase64;
+        var imageUrl = _chatExecutionContext.GeneratedImageUrl;
 
-        if (imageBase64 is null)
+        if (imageUrl is null)
         {
             var inlineImageMatch = InlineDataImageMarkdownCaptureRegex().Match(responseText);
             if (inlineImageMatch.Success)
             {
-                imageBase64 = inlineImageMatch.Groups[1].Value;
+                imageUrl = inlineImageMatch.Groups[1].Value;
             }
         }
 
-        if (imageBase64 is not null)
+        if (imageUrl is not null)
         {
             responseText = InlineDataImageMarkdownRegex().Replace(responseText, string.Empty).Trim();
 
@@ -145,11 +148,11 @@ public partial class TattooAgentService : ITattooAgentService
             UserId: userId,
             Role: "assistant",
             Content: responseText,
-            ImageBase64: imageBase64,
+            ImageUrl: imageUrl,
             CreatedAt: DateTime.UtcNow));
 
         await _chatSessionRepository.UpsertAsync(session with { UpdatedAt = DateTime.UtcNow });
-        return new ChatReplyResponse(session.Id, responseText, imageBase64);
+        return new ChatReplyResponse(session.Id, responseText, imageUrl);
     }
 
     private async Task<ChatSession> GetOrCreateSessionAsync(string userId, string artistId, string? sessionId, string userMessage)

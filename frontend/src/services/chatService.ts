@@ -15,14 +15,14 @@ export interface ChatMessage {
   userId: string
   role: 'user' | 'assistant'
   content: string
-  imageBase64?: string | null
+  imageUrl?: string | null
   createdAt: string
 }
 
 export interface ChatReply {
   sessionId: string
   text: string
-  imageBase64?: string | null
+  imageUrl?: string | null
 }
 
 export function fetchChatSessions(token: string) {

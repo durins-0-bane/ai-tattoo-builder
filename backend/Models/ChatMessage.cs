@@ -8,6 +8,6 @@ public record ChatMessage(
     string UserId,
     string Role,
     string Content,
-    string? ImageBase64,
+    string? ImageUrl,
     DateTime CreatedAt
 );

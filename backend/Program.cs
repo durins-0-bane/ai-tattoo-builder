@@ -7,8 +7,31 @@ using Microsoft.SemanticKernel;
 using TattooShop.Api.Features.Behaviors;
 using TattooShop.Api.Repositories;
 using TattooShop.Api.Services;
+using Azure.Identity;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Load configuration from Azure App Configuration (if configured)
+var appConfigConnectionString = builder.Configuration["AppConfig:ConnectionString"];
+var appConfigEndpoint = builder.Configuration["AppConfig:Endpoint"];
+
+if (!string.IsNullOrWhiteSpace(appConfigConnectionString))
+{
+    builder.Configuration.AddAzureAppConfiguration(options =>
+    {
+        options.Connect(appConfigConnectionString)
+            .Select(KeyFilter.Any, LabelFilter.Null);
+    });
+}
+else if (!string.IsNullOrWhiteSpace(appConfigEndpoint))
+{
+    builder.Configuration.AddAzureAppConfiguration(options =>
+    {
+        options.Connect(new Uri(appConfigEndpoint), new DefaultAzureCredential())
+            .Select(KeyFilter.Any, LabelFilter.Null);
+    });
+}
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -37,6 +60,7 @@ builder.Services.AddScoped<IChatSessionRepository, CosmosChatSessionRepository>(
 builder.Services.AddScoped<ITattooDesignRepository, CosmosTattooDesignRepository>();
 builder.Services.AddScoped<IUserRepository, CosmosUserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<ChatExecutionContext>();
 builder.Services.AddScoped<ITattooAgentService, TattooAgentService>();
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));

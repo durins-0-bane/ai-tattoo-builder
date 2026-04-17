@@ -13,7 +13,7 @@ public class TattooPortfolioPlugin(IMediator mediator, ChatExecutionContext exec
     private readonly ChatExecutionContext _executionContext = executionContext;
 
     [KernelFunction("save_tattoo_design")]
-    [Description("Saves a new AI-generated tattoo design to the user's portfolio. Call this immediately after an image is successfully generated.")]
+    [Description("Saves a tattoo design to the user's portfolio. ONLY call this when the user explicitly asks to save a design. Never call this automatically after generating an image.")]
     public async Task<string> SaveDesignAsync(
         string imageUrl, 
         string prompt,   

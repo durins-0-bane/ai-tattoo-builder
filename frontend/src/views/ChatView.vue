@@ -72,14 +72,14 @@
             <p class="message-text">{{ message.content }}</p>
 
             <img
-              v-if="message.imageBase64"
-              :src="message.imageBase64"
+              v-if="message.imageUrl"
+              :src="message.imageUrl"
               alt="Generated tattoo concept"
               class="message-image"
             />
 
             <button
-              v-if="message.imageBase64"
+              v-if="message.imageUrl"
               class="save-button"
               :disabled="savedKeys.includes(messageKey(message, index))"
               @click="saveGeneratedDesign(message, index)"
@@ -232,7 +232,7 @@ export default defineComponent({
         userId: this.user?.id ?? 'current-user',
         role: 'user',
         content: userText,
-        imageBase64: null,
+        imageUrl: null,
         createdAt: new Date().toISOString(),
       }
 
@@ -258,7 +258,7 @@ export default defineComponent({
             userId: this.user?.id ?? 'current-user',
             role: 'assistant',
             content: reply.text,
-            imageBase64: reply.imageBase64 ?? null,
+            imageUrl: reply.imageUrl ?? null,
             createdAt: new Date().toISOString(),
           },
         ]
@@ -282,7 +282,7 @@ export default defineComponent({
     },
 
     async saveGeneratedDesign(message: ChatMessage, index: number) {
-      if (!this.token || !message.imageBase64) return
+      if (!this.token || !message.imageUrl) return
 
       const promptSource = [...this.messages]
         .slice(0, index)
@@ -291,7 +291,7 @@ export default defineComponent({
 
       try {
         await saveDesign(this.token, {
-          imageUrl: message.imageBase64,
+          imageUrl: message.imageUrl,
           prompt: promptSource?.content ?? message.content,
           refinedPrompt: promptSource?.content ?? message.content,
           style: this.activeArtist?.specialties[0] ?? 'Custom/Hybrid',

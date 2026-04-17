@@ -6,12 +6,13 @@ using TattooShop.Api.Services;
 
 namespace TattooShop.Api.Plugins;
 
-public class TattooGeneratorPlugin(HttpClient httpClient, IConfiguration config, ILogger<TattooGeneratorPlugin> logger, ChatExecutionContext executionContext)
+public class TattooGeneratorPlugin(HttpClient httpClient, IConfiguration config, ILogger<TattooGeneratorPlugin> logger, ChatExecutionContext executionContext, IBlobStorageService blobStorage)
 {
     private readonly HttpClient _httpClient = httpClient;
     private readonly string _hfToken = config["HuggingFace:ApiKey"] ?? throw new ArgumentException("Hugging Face API Key missing!");
     private readonly ILogger<TattooGeneratorPlugin> _logger = logger;
     private readonly ChatExecutionContext _executionContext = executionContext;
+    private readonly IBlobStorageService _blobStorage = blobStorage;
     private static readonly string[] _retryTriggers = 
     [ 
         "currently loading", 
@@ -19,7 +20,7 @@ public class TattooGeneratorPlugin(HttpClient httpClient, IConfiguration config,
         "CUDA out of memory" 
     ];
 
-    public record ImageResult(string MessageToAi, string? Base64Data = null);
+    public record ImageResult(string MessageToAi);
 
     [KernelFunction("generate_tattoo_image")]
     [Description("Generates a high-quality tattoo image using the Stable Diffusion 3 Medium model.")]
@@ -44,9 +45,9 @@ public class TattooGeneratorPlugin(HttpClient httpClient, IConfiguration config,
                 if (response.IsSuccessStatusCode)
                 {
                     var imageBytes = await response.Content.ReadAsByteArrayAsync();
-                    var base64 = Convert.ToBase64String(imageBytes);
+                    var imageUrl = await _blobStorage.UploadImageAsync(imageBytes);
                     
-                    _executionContext.GeneratedImageBase64 = $"data:image/png;base64,{base64}";
+                    _executionContext.GeneratedImageUrl = imageUrl;
                     return new ImageResult(
                         MessageToAi: $"The image has been generated successfully using this prompt: \"{refinedPrompt}\". Tell the user here is their design. If they want changes, refine the prompt based on their feedback and generate again."
                     );
