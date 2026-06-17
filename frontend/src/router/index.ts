@@ -1,8 +1,8 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
-  history: createWebHashHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/login',
@@ -38,6 +38,10 @@ const router = createRouter({
       name: 'calendar',
       component: () => import('@/views/CalendarView.vue'),
       meta: { requiresAuth: true },
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/',
     },
   ],
 })
